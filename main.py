@@ -131,49 +131,47 @@ def run_etl():
                 # Registra o erro no log
                 logging.error(f"Erro ao acessar as issues do projeto {project['project_name']}: {str(e)}")
                 keep_running = False
+            
+            # Loop pelas issues atualizadas
+            for issue in updated_issues:
+                # Faz uma requisição GET para o endpoint worklog da API do Jira
+                response = requests.get(f"{jira_url}/issue/{issue}/worklog", headers=headers)
+                if response.status_code == 200:
+                    worklogs = response.json()["worklogs"]
+                    for worklog in worklogs:
+                        # Cria um objeto Worklog com as informações da API
+                        db_worklog = Worklog(
+                            issueKey=issue,
+                            worklog_id=worklog["id"],
+                            author=worklog["author"]["name"],
+                            started=worklog["started"],
+                            created=worklog["created"],
+                            updated=worklog["updated"],
+                            TimeSpentSegundos=worklog["timeSpentSeconds"],
+                            TimeSpent=worklog["timeSpent"],
+                            comments=worklog.get("comment")
+                        )
 
-    # Fecha a sessão com o banco de dados
-    session.close()
-    # Loop pelas issues atualizadas
-    for issue in updated_issues:
-        # Faz uma requisição GET para o endpoint worklog da API do Jira
-        response = requests.get(f"{jira_url}/issue/{issue}/worklog", headers=headers)
-        if response.status_code == 200:
-            worklogs = response.json()["worklogs"]
-            for worklog in worklogs:
-                # Cria um objeto Worklog com as informações da API
-                db_worklog = Worklog(
-                    issueKey=issue,
-                    worklog_id=worklog["id"],
-                    author=worklog["author"]["name"],
-                    started=worklog["started"],
-                    created=worklog["created"],
-                    updated=worklog["updated"],
-                    TimeSpentSegundos=worklog["timeSpentSeconds"],
-                    TimeSpent=worklog["timeSpent"],
-                    comments=worklog.get("comment")
-                )
+                        # Verifica se a versão do worklog na API é mais nova que a do banco
+                        db_worklog_in_db = session.query(Worklog).filter_by(
+                            worklog_id=db_worklog.worklog_id
+                        ).first()
+                        if db_worklog_in_db is None:
+                            session.add(db_worklog)
+                            worklogs_saved += 1
 
-                # Verifica se a versão do worklog na API é mais nova que a do banco
-                db_worklog_in_db = session.query(Worklog).filter_by(
-                    worklog_id=db_worklog.worklog_id
-                ).first()
-                if db_worklog_in_db is None:
-                    session.add(db_worklog)
-                    worklogs_saved += 1
-
-                elif datetime.datetime.strptime(db_worklog.updated, "%Y-%m-%dT%H:%M:%S.%f%z") > db_worklog_in_db.updated:
-                    session.delete(db_worklog_in_db)
-                    session.add(db_worklog)
-                    worklogs_saved += 1
+                        elif datetime.datetime.strptime(db_worklog.updated, "%Y-%m-%dT%H:%M:%S.%f%z") > db_worklog_in_db.updated:
+                            session.delete(db_worklog_in_db)
+                            session.add(db_worklog)
+                            worklogs_saved += 1
 
 
-            # Salva as informações dos worklogs no banco de dados
-            session.add(update)
-            session.commit()
-        else:
-            # Registra o erro no log
-            logging.error(f"Erro ao acessar o worklog da issue {issue}: {response.json()}")
+                    # Salva as informações dos worklogs no banco de dados
+                    session.add(update)
+                    session.commit()
+                else:
+                    # Registra o erro no log
+                    logging.error(f"Erro ao acessar o worklog da issue {issue}: {response.json()}")
 
     # Fecha a sessão com o banco de dados
     session.close()

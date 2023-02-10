@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "jira-alchemy"
+version = "0.1.0"
+description = ""
+authors = ["Henrique <henrique.moretti@totvs.com.br>"]
+readme = "README.md"
+packages = [{include = "jira_alchemy"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+requests = "^2.28.2"
+sqlalchemy = "^2.0.1"
+logging = "^0.4.9.6"
+sqlalchemy-orm = "^1.2.4"
+psycopg2 = "^2.9.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
