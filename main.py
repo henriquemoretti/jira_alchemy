@@ -42,10 +42,27 @@ projects = [row.projetos for row in session.query(Projetos).all()]
 jira_url = 'https://jiraproducao.totvs.com.br/rest/api/2'
 headers = {
     'User-Agent': 'DataStudio Engenharia V&D',
-    'Authorization': 'Basic aGVucmlxdWUubW9yZXR0aTpTQG5zdW5nQDEyMyM0NTZAMTIz'
+    'Authorization': 'Basic YW5kZXJzb24uZmlsaG86QEl6YWJlbGExMTEz'
     }
 
 updated_issues = []
+
+def setTestCaseFields(issue): 
+    test_Url = "https://jiraproducao.totvs.com.br/rest/tests/1.0/issue"
+    issueId = getattr(issue,"issueId")
+    response = requests.get(f"{test_Url}/{issueId}/tracelinks?maxResults=1&startAt=0", headers=headers)
+    test_cases = response.json()["testCase"]["blocks"]["traceLinks"]
+    test_runs = response.json()["testRun"]["blocks"]["traceLinks"]
+    test_plans = response.json()["testPlan"]["blocks"]["traceLinks"]
+    
+    #Casos de Teste
+    setattr(issue, 'has_test_cases', 'Sim') if test_cases!=[] else setattr(issue, 'has_test_cases', 'Não')
+    #Planos de Teste
+    setattr(issue, 'has_test_plans', 'Sim') if test_plans!=[] else setattr(issue, 'has_test_plans', 'Não')
+    #Execuções de Teste
+    setattr(issue, 'has_test_runs', 'Sim') if test_runs!=[] else setattr(issue, 'has_test_runs', 'Não')
+    
+    return issue
 
 def run_etl():
     logging.info("Iniciando ETL process")
@@ -101,6 +118,8 @@ def run_etl():
                             else:
                                 break
                         setattr(db_issue, db_field, value)
+                    # Adiciona os campos se há testes de casos de uso
+                    db_issue = setTestCaseFields(db_issue)
 
 
                     # Verifica se a versão da issue na API é mais nova que a do banco
